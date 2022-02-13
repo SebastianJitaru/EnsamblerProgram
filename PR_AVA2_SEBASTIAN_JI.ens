@@ -1,0 +1,222 @@
+; ---------------------------------------------------------------
+; Nom alumne : Sebastian Jitaru
+; Grup:2
+; Sessió: PR-AVA2 (DIA/MES/2021)
+; ---------------------------------------------------------------
+
+
+
+TECLAT EQU 0A000h; EL TECLADO Y LA PANTALLA SE PONEN COMO CONSTANTES
+PANTALLA EQU 0B000h
+
+ORIGEN 600h
+
+INICIO ini
+
+.DATOS
+	;00FFFTTT CCCCCCCC  ->  00000101b  43h  -> 0543H 'C' EN FONDO NEGRO Y TEXTO CIAN
+
+	codi VALOR 0543h, 054Fh, 0544h, 0549h; CODI EN FONDO NEGRO Y TEXTO CIAN
+	clave VALOR 0C45h, 1370h ,1553h; EpS 
+		
+		;00FFFTTT CCCCCCCC  ->  0001 0111 BINARIO -> 17h FONDO VERDE TEXTO BLANCO
+	
+	palabraFELICITATS VALOR 1746h, 1745h, 174Ch,1749h, 1743h, 1749h, 1754h, 1741h, 1754h, 1753h						;'FELICITATS' FONDO VERDE TEXTO BLANCO
+	
+	palabra30ANYS VALOR 	1733h, 1730h, 1741h, 174Eh, 1759h, 1753h												;'30ANYS' FONDO VERDE TEXTO BLANCO
+	
+		;00FFFTTT CCCCCCCC  ->  0010 0011 BINARIO -> 23h FONDO ROJO TEXTO AMARILLO
+	
+	palabraERROR VALOR 2345h, 2352h, 2352h, 234Fh, 2352h ; 'ERROR' FONDO ROJO TEXTO AMARILLO
+
+	entrada VALOR 3 VECES 0000h                    ;array donde guardaremos la input del usuario
+
+.CODIGO
+
+ini:
+
+
+	MOVL R0, BYTEBAJO TECLAT; R0_LOW=00H
+	MOVH R0, BYTEALTO TECLAT; R0_HIGH=B0--> R0=A000h
+
+	MOVL R6, BYTEBAJO PANTALLA;
+	MOVH R6, BYTEALTO PANTALLA; R6=B000h
+
+;-----esborrem el buffer del teclat-----
+	MOV R1,R0; R1-> A000
+	INC R1; R1= A001 <-- DIRECCIÓN DE CONTROL DEL TECLADO
+
+																			;FEDC BA98 7654 3210
+																			;0000 0000 0000 0100 EL BIT 2 ACTIVADO-> TRANSPAS BORRA TODO EL BUFFER
+																			;FEDC BA98 7654 3210
+
+	MOVH R2, 00H
+	MOVL R2, 00000100b														; TAMBIÉN PUEDE SER 04H EN R2 TENGO LA ACCIÓN DE BORRAR BUFFER R2=0004H
+
+	MOV [R1], R2 															; ORDEN QUE ENVIO 0004 BORRA TODO EL BUFFER
+
+
+;IMPRIMIR CODI POR PANTALLA
+	
+	;-----esborrem pantalla-----
+	
+	MOVH R7, 00H
+	MOVL R7, 120															; 78h=120d
+	ADD R7,R6,R7													
+
+																			;FEDC BA98 7654 3210
+																			;0000 0000 0000 0011  ACTIVEM BIT ENCENDRE PANTALLA I EL DE BORRAR
+
+	MOVH R2, 00H
+	MOVL R2, 00000011b												
+	MOV [R7],R2;
+
+ 
+	MOVL R2, BYTEBAJO DIRECCION codi
+	MOVH R2, BYTEALTO DIRECCION codi
+
+	MOVL R4, 04h
+	MOVH R4, 00h
+	
+	MOVH R3, 00h
+	MOVL R3, 00h															
+	
+	ADD R6,R3,R6															;en R6 tenemos la posicion en la que tenemos que empezar a escribir la palabra codi
+
+	esc_codi:
+		MOV R3, [R2]														; guardo la primera lletra de codi en R3
+		MOV [R6],R3															; escric la lletra en la posico de pantalla indicada anteriorment
+		
+		INC R2																; incremento una posicio el iterador del array de la paraula codi per anar a la seguent lletra 
+		INC R6																; incremento una posicio en la pantalla per escrire la seguent lletra a la seguent casella
+				
+		DEC R4;																;decremento el iterador de la paraula codi R4 = codi.length
+		BRNZ esc_codi
+		
+; FIN DE IMPRIMIR CODI POR PANTALLA
+																												
+;consultar l'estat del teclat fins que es premi una tecla
+
+	MOVL R5, 03h;
+	MOVH R5, 00h;
+
+	MOVL R4, BYTEBAJO DIRECCION entrada
+	MOVH R4, BYTEALTO DIRECCION entrada																			; para guardar las 3 letras que introducira el usuario
+
+	guardar_entrada:
+																												;0000 0001 0000 0000 (=01 00) EL BIT 8 ACTIVADO-> HAY CARÁCTER EN EL BUFFER
+																												;FEDC BA98 7654 3210
+	
+		MOVH R2,01h
+		MOVL R2,00h; R2=0100H
+	
+
+		no_tecla:
+			MOV R3, [R1]																						; posem el contigut a B001 per saber el estat del teclat
+			MOVL R3, 00H																						; posem a 0 per veure si hi ha lletra o no
+			COMP R3,R2																							; si son iguals voldra dir que hi ha caracter
+			BRNZ no_tecla
+
+																												;HAY CARACTER EN EL BUFFER
+																												;movem el caracter del buffer a la posicio indicada del array entrada
+		MOV R7, [R0]
+		MOV [R4],R7
+		
+																												;escribim el caracter a la pantalla
+																												;00FFFTTT CCCCCCCC  ->  0011 1000 BINARIO -> 38h FONDO BLANCO TEXTO NEGRO
+		MOVH R7, 38H
+		MOV [R6],R7																								;escribim per pantalla el caracter
+	
+		INC R4																									; incrementem r4 per guardar el seguent caracter
+		INC R6																									; incrementem R6 per impirmir en la seguent casella de pantalla
+
+		DEC R5																									; PORQUE SOLO NECESITO 5 CARACTERES
+		BRNZ guardar_entrada
+
+																												
+;----------COMPROVAR QUE EL CODIGO ENTRADO ES O NO CORRECTO-----------
+	
+	MOVL R4, BYTEBAJO DIRECCION entrada
+	MOVH R4, BYTEALTO DIRECCION entrada																			; PARA EMPEZAR DESDE EL PRINCIPIO LA COMPARACIÓN (lo que hubisemos escrito en teclado)
+
+	MOVL R3, BYTEBAJO DIRECCION clave
+	MOVH R3, BYTEALTO DIRECCION clave																			; comencem desde el inici de la paraula clau (EpS)
+
+	MOVL R5, 03h;
+	MOVH R5, 00h																								; R5 = 3 pq haurem de comparar 3 caracters
+
+	MOVL R6, BYTEBAJO PANTALLA;
+	MOVH R6, BYTEALTO PANTALLA; R6=B000h
+	
+	MOVL R0, 63
+	MOVH R0, 00h
+	
+	ADD R6,R0,R6
+
+	MOVL R2, 05h
+	MOVH R2, 00h; ITERADOR DE ERROR 
+
+		
+																											
+	compara:
+		MOV R0, [R4]																							; guardo en R0 la posicio de memoria del casella array entrada (entrada)
+		MOV R1, [R3]																							; GUARDO EN R1 EL CARACTER DE LA POSICIÓN R3 DE MEMORIA (clave)
+		INC R4																									; vaid a la seguent posicio del array entrada
+		INC R3																									; vaig al seguent caracter del array clave
+		COMP R0,R1																								; el comp donara 0 si son iguals i !=0 si son diferents
+		BRNZ error
+		
+		DEC R5																									; TENEMOS QUE COMPARAR SOLO 3 CARACTERES
+		BRNZ compara
+
+																												;si arribe aqui es que els caracters introduits son iguals
+		
+																												
+;--------------a paritr d'aqui imprimim per pantalla error o felicitats 30anys segons si es correcte o no--------------------	(ho faig amb 3 bucles 1 per imprimir cada array)
+	MOVL R3, BYTEBAJO DIRECCION palabraFELICITATS
+	MOVH R3, BYTEALTO DIRECCION palabraFELICITATS; esta todo bien ponemos FELICITATS
+	MOVL R2, 0Ah
+	MOVH R2, 00h; ITERADOR DE FELICITATS
+	
+	felicitats: 
+		MOV R0, [R3]
+		MOV [R6], R0
+		INC R6
+		INC R3
+		DEC R2
+		BRNZ felicitats
+	
+	MOVL R3, BYTEBAJO DIRECCION palabra30ANYS
+	MOVH R3, BYTEALTO DIRECCION palabra30ANYS
+	MOVL R2, 06h
+	MOVH R2, 00h; ITERADOR DE 30anys
+	MOVL R6, BYTEBAJO PANTALLA;
+	MOVH R6, BYTEALTO PANTALLA; R6=B000h
+	MOVL R0, 80
+	MOVH R0, 00h
+	
+	ADD R6,R6,R0
+	anys: 
+		MOV R0, [R3]
+		MOV [R6], R0
+		INC R6
+		INC R3
+		DEC R2
+		BRNZ anys
+	
+	JMP fi
+
+	error:
+		MOVL R3, BYTEBAJO DIRECCION palabraERROR
+		MOVH R3, BYTEALTO DIRECCION palabraERROR; esta todo bien ponemos OK
+		er:
+			MOV R0, [R3]
+			MOV [R6], R0
+			INC R6
+			INC R3
+			DEC R2
+			BRNZ er
+
+	fi:
+	 	JMP -1
+FIN
